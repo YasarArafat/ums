@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Hello</title>
+Hello {{.Fname}} {{.Lname}}
+</head>
+<body>
+{{.errorMessege}}
+<form action="/updateProfile" method="POST">
+Fname	<input type="text" name="fname" value="{{.Fname}}"><br>
+Lname	<input type="text" name="fname" value="{{.Lname}}"><br>
+Email	<input type="text" name="fname" value="{{.Email}}"><br>
+<input type="submit" name="submit" Value="Update">
+
+</form>
+
+</body>
+</html>
