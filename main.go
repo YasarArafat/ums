@@ -36,14 +36,14 @@ func RegisterNewUser(user *User) bool {
 
 //1
 func IsEmailExist(param ...interface{}) bool {
-
+	var r *gorm.DB
 	if len(param) == 1 {
 		var user User
-		r := db.Select("id").Find(&user, "email=?", param[0].(string))
+		r = db.Select("id").Find(&user, "email=?", param[0].(string))
 
 	} else if len(param) == 2 {
 		var user User
-		r := db.Find(&user, "email <> ? AND id = ?", param[0].(string), param[1].(uint), 20)
+		r = db.Find(&user, "email = ? AND id <> ?", param[0].(string), param[1].(uint))
 	}
 
 	if r.RowsAffected > 0 {
@@ -88,6 +88,7 @@ func Register(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		//	IsEmailExist(w,r.FormValue("email"))
 		if IsEmailExist(r.FormValue("email")) {
 			fmt.Fprint(w, "Email Already Exists")
+
 		} else {
 			user := User{Fname: r.FormValue("fname"),
 				Lname:    r.FormValue("lname"),
@@ -133,17 +134,81 @@ func updateProfile(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 	}
 	if session != nil {
 		if r.Method == "POST" {
-			if IsEmailExist(r.FormValue("email"), session.Values["userId"]) {
+			if !IsEmailExist(r.FormValue("email"), session.Values["userId"]) {
+				//user := User{Fname: r.FormValue("fname"), Lname: r.FormValue("lname"), r.FormValue("email")}
+				//session.Values["userId"]
+				row := db.Model(&User{}).Where("id = ?", session.Values["userId"]).Updates(User{Fname: r.FormValue("fname"), Lname: r.FormValue("lname"), Email: r.FormValue("email")})
+				if row.RowsAffected > 0 {
+					var user User
+					row := db.Where("id = ?", session.Values["userId"]).First(&user)
+					if row.RowsAffected > 0 {
+						data := struct {
+							User    *User
+							Message string
+						}{
+							&user,
+							"Insert SuccessFull",
+						}
+						t, err := template.ParseFiles("public/template/updateProfile.html")
+						checkErr(err)
+						err = t.Execute(w, data)
+						checkErr(err)
+					} else {
+						fmt.Fprint(w, "Somthing Went Wrong in Update Profile")
+					}
+				} else {
+					fmt.Fprint(w, "Something Went Wrong UpdateProfile1")
 
+				}
+
+			} else {
+				fmt.Fprint(w, "False")
 			}
 		} else if r.Method == "GET" {
 			var user User
 			row := db.Where("id = ?", session.Values["userId"]).First(&user)
 			if row.RowsAffected > 0 {
-				Render(w, "public/template/updateProfile.html", user)
+				data := struct {
+					User    *User
+					Message string
+				}{
+					&user,
+					"",
+				}
+				t, err := template.ParseFiles("public/template/updateProfile.html")
+				checkErr(err)
+				err = t.Execute(w, data)
+				checkErr(err)
 			} else {
 				fmt.Fprint(w, "Cheack Somthing is wrong in userUpdate")
 			}
+		}
+
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}
+}
+
+func changePassword(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	session, err := store.Get(r, "userId")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if session != nil {
+		if r.Method == "POST" {
+			var user User
+			row := db.Select("password").Find(&user, "id=?", session.Values["userId"])
+			if row.RowsAffected > 0 {
+				if r.FormValue("oldPassword") == user.Password {
+
+				}
+			} else {
+
+			}
+		} else if r.Method == "GET" {
+
+			Render(w, "public/template/changePassword.html")
 		}
 
 	} else {
@@ -207,6 +272,8 @@ func main() {
 	router.GET("/userHome", userHome)
 	router.GET("/updateProfile", updateProfile)
 	router.POST("/updateProfile", updateProfile)
+	router.GET("/changePassword", changePassword)
+	router.POST("/changePassword", changePassword)
 
 	router.GET("/logOut", LogOut)
 	//	router.POST("", handle)
